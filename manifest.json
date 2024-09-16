@@ -1,9 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "URL and Size Logger",
-  "version": "1.1",
-  "description": "Logs URLs of network requests and their response sizes to the console",
+  "name": "TTML2 to CSV Converter",
+  "version": "1.0",
+  "description": "Converts TTML2 files to CSV and provides file management",
   "permissions": [
+    "storage",
+    "activeTab",
     "webRequest",
     "downloads"
   ],
@@ -12,5 +14,13 @@
   ],
   "background": {
     "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   }
 }
