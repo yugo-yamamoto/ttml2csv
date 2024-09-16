@@ -4,12 +4,10 @@
   "version": "1.0",
   "description": "Converts TTML2 files to CSV and provides file management",
   "permissions": [
-    "webRequest",
-    "downloads",
     "storage",
     "activeTab",
-    "tabs",
-    "scripting"
+    "webRequest",
+    "downloads"
   ],
   "host_permissions": [
     "<all_urls>"

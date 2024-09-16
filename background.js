@@ -8,11 +8,15 @@ class DownloadedFiles {
     this.updateBadge();
   }
 
+  clear() {
+    this.files.clear();
+    this.updateBadge();
+  }
+
   updateBadge() {
     chrome.action.setBadgeText({text: this.files.size.toString()});
   }
 }
-
 let downloadedFiles = new DownloadedFiles();
 
 function extractTtml2Data(ttml2Content) {
@@ -20,12 +24,14 @@ function extractTtml2Data(ttml2Content) {
   const matches = [];
   let match;
   while ((match = pattern.exec(ttml2Content)) !== null) {
-    const begin = match[1];
+    const begin = match[1].split(".")[0];
     const text = match[2].replace(/<.*?>/g, '').trim();
     matches.push([begin, text]);
   }
   return matches;
 }
+
+
 
 function convertToCsv(extractedData) {
   const header = '\uFEFFBegin,Text\n';
@@ -74,6 +80,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         saveCsvToDownloads(csvData, filename);
       })
       .catch(error => console.error('Error fetching TTML2 file:', error));
+  } else if (request.action === "clearHistory") {
+    downloadedFiles.clear();
+    sendResponse({success: true});
   }
   return true;
 });
