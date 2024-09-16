@@ -1,7 +1,20 @@
-// ダウンロードされたファイル名を保持するセット
-let downloadedFiles = new Set();
+class DownloadedFiles {
+  constructor() {
+    this.files = new Map();
+  }
 
-// TTML2データを抽出する関数
+  add(url, filename) {
+    this.files.set(url, filename);
+    this.updateBadge();
+  }
+
+  updateBadge() {
+    chrome.action.setBadgeText({text: this.files.size.toString()});
+  }
+}
+
+let downloadedFiles = new DownloadedFiles();
+
 function extractTtml2Data(ttml2Content) {
   const pattern = /<p\s+begin="(.*?)"[^>]*>(.*?)<\/p>/g;
   const matches = [];
@@ -14,16 +27,13 @@ function extractTtml2Data(ttml2Content) {
   return matches;
 }
 
-// 抽出したデータをCSV形式に変換する関数
 function convertToCsv(extractedData) {
   const header = '\uFEFFBegin,Text\n';
   const rows = extractedData.map(([begin, text]) => `"${begin}","${text}"`).join('\n');
   return header + rows;
 }
 
-// CSVデータをダウンロードフォルダに保存する関数
 function saveCsvToDownloads(csvData, filename) {
-  // データURLを作成
   const dataUrl = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
   
   chrome.downloads.download({
@@ -39,56 +49,31 @@ function saveCsvToDownloads(csvData, filename) {
   });
 }
 
-// TTML2ファイルを処理する関数
-function processTtml2File(ttml2Content, url) {
-  const extractedData = extractTtml2Data(ttml2Content);
-  const csvData = convertToCsv(extractedData);
-  const filename = url.split('/').pop().replace('.ttml2', '.csv');
-  saveCsvToDownloads(csvData, filename);
-  console.log(`CSV saved as ${filename} in Downloads folder.`);
-}
-
-// ファイル名をキャッシュし、ダウンロードする関数
-function handleDownload(filename, url) {
-  if (!downloadedFiles.has(filename)) {
-    // TTML2ファイルのダウンロードと処理
-    fetch(url)
-      .then(response => response.text())
-      .then(ttml2Content => {
-        processTtml2File(ttml2Content, url);
-        downloadedFiles.add(filename);
-        console.log(`Processed and cached the filename: ${filename}`);
-      })
-      .catch(error => console.error('Error processing TTML2 file:', error));
-  } else {
-    console.log(`File ${filename} has already been processed.`);
-  }
-}
-
-// リクエスト完了時のログとダウンロード処理
 chrome.webRequest.onCompleted.addListener(
   function(details) {
-    let size = details.responseHeaders ? 
-      details.responseHeaders.find(h => h.name.toLowerCase() === "content-length") :
-      null;
-    let sizeStr = size ? `${size.value} bytes` : "unknown size";
-    
-    console.log(`Request completed: ${details.url}`);
-    console.log(`Response size: ${sizeStr}`);
-    
-    // URLの拡張子が.ttml2かどうかをチェック
     if (details.url.toLowerCase().endsWith('.ttml2')) {
-      console.log('TTML2 file detected. Processing...');
-      
-      // URLからファイル名を抽出
+      console.log('TTML2 file detected:', details.url);
       let filename = details.url.split('/').pop();
-      
-      // ダウンロード処理（キャッシュチェック込み）
-      handleDownload(filename, details.url);
+      downloadedFiles.add(details.url, filename);
     }
-    
-    console.log("---");  // リクエスト間の区切り
   },
   {urls: ["<all_urls>"]},
   ["responseHeaders"]
 );
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "getFiles") {
+    sendResponse({files: Array.from(downloadedFiles.files.entries())});
+  } else if (request.action === "fetchAndConvert") {
+    fetch(request.url)
+      .then(response => response.text())
+      .then(ttml2Content => {
+        const extractedData = extractTtml2Data(ttml2Content);
+        const csvData = convertToCsv(extractedData);
+        const filename = request.url.split('/').pop().replace('.ttml2', '.csv');
+        saveCsvToDownloads(csvData, filename);
+      })
+      .catch(error => console.error('Error fetching TTML2 file:', error));
+  }
+  return true;
+});
